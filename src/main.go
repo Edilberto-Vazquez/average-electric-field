@@ -31,23 +31,24 @@ func GetFileName(path string) (fileName string) {
 	return
 }
 
-func ReadFile(path string) (line [][]string) {
+func ReadFile(path string, c chan [][]string) {
 	file, err := os.Open(path)
 	Error(err)
 	defer file.Close()
 	fileName := GetFileName(path)
-	fileDate := fmt.Sprintf("%s-%s-%s", fileName[17:21], fileName[13:15], fileName[15:17])
+	fileDate := fileName[17:21] + "-" + fileName[13:15] + "-" + fileName[15:17]
 	scanner := bufio.NewScanner(file)
+	var lines [][]string
 	for scanner.Scan() {
 		value := strings.Split(scanner.Text(), ",")
-		value[0] = fmt.Sprintf("%s %s", fileDate, value[0])
-		line = append(line, value)
+		value[0] = fileDate + " " + value[0]
+		lines = append(lines, value)
 	}
-	return
+	c <- lines
 }
 
-func WriteFile(lines []string) {
-	file, err := os.Create("/home/edilberto/Desktop/New.txt")
+func WriteFile(path string, lines []string) {
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
 	Error(err)
 	defer file.Close()
 	write := bufio.NewWriter(file)
@@ -65,13 +66,14 @@ func CalcAverage(chunk [][]string) (average float64) {
 		Error(err)
 		sum += converFloat
 	}
-	average = math.Floor((sum / lenList * 100)) / 100
+	average = math.Round((sum / lenList * 100)) / 100
 	return
 }
 
-func ProcessLines(list [][]string) (newList []string) {
+func ProcessLines(list [][]string, c chan<- []string) {
 	var checkLine []string = list[0]
 	var chunkList [][]string
+	var newList []string
 	for _, v := range list {
 		if checkLine[0] == v[0] {
 			chunkList = append(chunkList, v)
@@ -82,10 +84,23 @@ func ProcessLines(list [][]string) (newList []string) {
 			chunkList = [][]string{}
 		}
 	}
-	return
+	c <- newList
 }
 
 func main() {
-	WriteFile(ProcessLines(ReadFile("/home/edilberto/Desktop/INAOE parque-01142019.efm")))
-	// fmt.Println(ReadDir("/home/edilberto/Desktop/"))
+	files := ReadDir("/home/edilberto/Desktop/files")
+	file, err := os.Create("/home/edilberto/Desktop/electric-field-measurements.txt")
+	Error(err)
+	defer file.Close()
+	read := make(chan [][]string, len(files))
+	process := make(chan []string, len(files))
+	for _, v := range files {
+		go ReadFile("/home/edilberto/Desktop/files/"+v, read)
+		go ProcessLines(<-read, process)
+	}
+	close(read)
+	for i := 0; i < len(files); i++ {
+		WriteFile("/home/edilberto/Desktop/electric-field-measurements.txt", <-process)
+	}
+	close(process)
 }
