@@ -47,10 +47,10 @@ func ReadFile(path string, c chan [][]string) {
 	c <- lines
 }
 
-func WriteFile(path string, lines []string) {
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
-	Error(err)
-	defer file.Close()
+func WriteFile(file *os.File, path string, lines []string) {
+	// file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	// Error(err)
+	// defer file.Close()
 	write := bufio.NewWriter(file)
 	for _, v := range lines {
 		write.WriteString(v)
@@ -88,19 +88,19 @@ func ProcessLines(list [][]string, c chan<- []string) {
 }
 
 func main() {
-	files := ReadDir("/home/edilberto/Desktop/files")
+	files := ReadDir("/media/edilberto/Nuevo vol/DataSets/Conjuntos-originales/medidor-campo-electrico/")
 	file, err := os.Create("/home/edilberto/Desktop/electric-field-measurements.txt")
 	Error(err)
 	defer file.Close()
 	read := make(chan [][]string, len(files))
 	process := make(chan []string, len(files))
 	for _, v := range files {
-		go ReadFile("/home/edilberto/Desktop/files/"+v, read)
+		go ReadFile("/media/edilberto/Nuevo vol/DataSets/Conjuntos-originales/medidor-campo-electrico/"+v, read)
 		go ProcessLines(<-read, process)
 	}
 	close(read)
 	for i := 0; i < len(files); i++ {
-		WriteFile("/home/edilberto/Desktop/electric-field-measurements.txt", <-process)
+		WriteFile(file, "/home/edilberto/Desktop/electric-field-measurements.txt", <-process)
 	}
 	close(process)
 }
